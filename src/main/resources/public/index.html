@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Chat</title>
+    <link type="text/css" rel="stylesheet"
+          href="webjars/bootstrap/3.0.3/css/bootstrap.min.css">
+
+</head>
+<body ng-app="app">
+<div class="text-center">
+    <h1>SimpleWeb4j Chat</h1>
+</div>
+
+<div ng-controller="ChatCtrl">
+    <!-- Partie login, affichée seulement si l'utilisateur n'est pas loggé -->
+    <div class="row" ng-show="!loggedIn">
+        <div class="well col-md-4 col-md-offset-4">
+            <form role="form">
+                <div class="form-group">
+                    <label for="pseudo">Pseudo</label>
+                    <input type="text" class="form-control" id="pseudo" name="pseudo"
+                           placeholder="Enter pseudo" ng-model="userTmp">
+                </div>
+                <button type="submit" class="btn btn-default"
+                        ng-click="login(userTmp)">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Formulaire pour l'envoi de message,
+    affiché seulement si l'utilisateur est loggé -->
+    <div class="row" ng-show="loggedIn">
+        <div class="well col-md-4 col-md-offset-4 text-center">
+            <form class="form-inline" role="form">
+                <div class="form-group">
+                    <input id="message" type="text" class="form-control"
+                           placeholder="Say hello!" ng-model="message"/>
+                </div>
+                <button type="submit" class="btn btn-default"
+                        ng-click="sendMessage()">Post</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Table où sont affichés les messages,
+    affichée seulement si l'utilisateur est loggé -->
+    <div class="row" ng-show="loggedIn">
+        <div class="well col-md-4 col-md-offset-4">
+            <div class="row text-right">
+                <button class="btn btn-default" ng-click="logout()">Logout</button>
+            </div>
+            <div class="row" style="margin:10px">
+                <table class="table table-bordered table-condensed
+                              table-hover table-striped">
+                    <tr ng-repeat="message in messages">
+                        <td>
+                            <b>{{message.user}}</b><br/>
+                            <small>
+                                {{message.date | date : 'dd/MM/yyyy HH:mm:ss.sss'}}
+                            </small>
+                        </td>
+                        <td>{{message.texte}}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript" src="webjars/jquery/2.0.3/jquery.min.js"></script>
+<script type="text/javascript" src="webjars/angularjs/1.2.8/angular.js"></script>
+<script>
+    var app = angular.module('app', []);
+    app.controller('ChatCtrl', function ($scope, $timeout) {
+        // On initialise le tableau de message à vide.
+        $scope.messages = [];
+        // Pas défaut, l'utilisateur n'est pas loggé.
+        $scope.loggedIn = false;
+        // Focus sur l'input du pseudo.
+        $timeout(function () {
+            $("#pseudo").focus();
+        });
+
+        /**
+         * Fonction appelée lors du click sur login.
+         * @param newUser pseudo choisi.
+         */
+        $scope.login = function (newUser) {
+            $scope.user = newUser;
+            // Création de la websocket.
+            $scope.ws = new WebSocket("ws://localhost:9999/chat/" + $scope.user);
+            // Quand on reçoit un message, on l'ajoute au tableau de message.
+            $scope.ws.onmessage = function (message) {
+                $scope.$apply(function () {
+                    $scope.messages.unshift(JSON.parse(message.data));
+                });
+            };
+            // Quand le flux est ouvert, on envoie un message "connected"
+            $scope.ws.onopen = function () {
+                $scope.ws.send(JSON.stringify("connected"));
+            };
+            // L'utilisateur est maintenant connecté.
+            $scope.loggedIn = true;
+            // Focus sur l'input des messages.
+            $timeout(function () {
+                $("#message").focus();
+            });
+        };
+
+        /**
+         * Fonction appelée quand on click sur logout.
+         */
+        $scope.logout = function () {
+            // Envoi du message "disconnected"
+            $scope.ws.send("disconnected");
+            $timeout(function () {
+                // Fermeture de la websocket.
+                $scope.ws.close();
+                // L'utilisateur n'est plus connecté.
+                $scope.loggedIn = false;
+                // Focus sur l'input du pseudo.
+                $timeout(function () {
+                    $("#pseudo").focus();
+                });
+            });
+        };
+
+        /**
+         * Fonction permettant d'envoyer un message.
+         */
+        $scope.sendMessage = function () {
+            // Transformation en JSON et envoi.
+            $scope.ws.send(JSON.stringify($scope.message));
+            // On vide l'input.
+            $scope.message = "";
+        }
+    });
+</script>
+</body>
+</html>
